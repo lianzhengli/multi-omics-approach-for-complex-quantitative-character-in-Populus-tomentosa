@@ -1,0 +1,97 @@
+rm(list = ls())
+Expr1 <- read.csv("candidate_genes_expression_fpkm.csv", header = TRUE)
+Expr2 <- log(Expr1+1, 2)
+dim(Expr2)
+head(Expr2)[,1:6]
+library(WGCNA)
+library(flashClust)
+library(reshape2)
+library(stringr)
+library(BiocParallel)
+options(stringsAsFactors = FALSE)
+enableWGCNAThreads()
+register(MulticoreParam(45))
+allowWGCNAThreads(nThreads = 45)
+corType = "pearson"
+maxPOutliers = 0.05
+robustY = FALSE
+Expr_t <- as.data.frame(t(Expr2))
+gsg = goodSamplesGenes(Expr_t, verbose = 3)
+if (!gsg$allOK){
+  # Optionally, print the gene and sample names that were removed:
+  if (sum(!gsg$goodGenes)>0) 
+    printFlush(paste("Removing genes:", 
+                     paste(names(Expr2)[!gsg$goodGenes], collapse = ",")));
+  if (sum(!gsg$goodSamples)>0) 
+    printFlush(paste("Removing samples:", 
+                     paste(rownames(Expr2)[!gsg$goodSamples], collapse = ",")));
+  # Remove the offending genes and samples from the data:
+  Expr_t = Expr_t[gsg$goodSamples, gsg$goodGenes]
+}
+nGenes = ncol(Expr_t)
+nSamples = nrow(Expr_t)
+dim(Expr_t)
+sampleTree <- hclust(dist(Expr_t), method = "average")
+par(mar = c(0,4,2,0))
+pdf(file = "sampleTree.pdf", width = 12, height = 9)
+plot(sampleTree, main = "Sample clustering to detect outliers", sub="", xlab="")
+dev.off()
+clust <- cutreeStatic(sampleTree, cutHeight = 400, minSize =6)
+rownames(Expr_t)[clust==0]
+keepSamples <- (clust != 0)
+Expr3 <- Expr_t[keepSamples, ]
+dim(Expr3)
+geneNames <- colnames(Expr3)
+powers <- c(seq(1, 10, by=1), seq(12, 30, by=2))
+type ="unsigned"
+sft <- pickSoftThreshold(Expr3, powerVector = 7, 
+                        networkType = type, corFnc = corType, 
+                        corOptions = list(use = 'p', maxPOutliers = maxPOutliers), 
+                        verbose=5)
+sizeGrWindow(9,5)
+par(mfrow= c(1,2))   
+cex1=0.9        
+pdf("wgcna_soft.thresholding.pdf")
+plot(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     xlab="Soft Threshold (power)",ylab="Scale Free Topology Model Fit,signed R^2",type="n",
+     main = paste("Scale independence"))
+text(sft$fitIndices[,1], -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+     labels=7,cex=cex1,col="red")
+abline(h=0.85,col="red")
+dev.off()
+power = sft$powerEstimate 
+power
+softPower <- 7
+net <- blockwiseModules(
+  Expr3, 
+  maxBlockSize = dim(Expr3)[2],
+  corType = corType,
+  # calclute the adjacency matrix
+  power = 3,
+  networkType = type,
+  # TOM similarity matrices
+  TOMType = type,
+  saveTOMs = TRUE, 
+  saveTOMFileBase = "blockwiseTOM",
+  # Module identification using dynamic tree cut
+  #deepSplit = 4, 
+  minModuleSize = 100,
+  mergeCutHeight =0.25,    
+  numericLabels = F, # modudule named in number
+  nThreads = 0, 
+  verbose = 3)
+module_colors <- setdiff(unique(moduleColors), "grey")
+for (color in module_colors){module <- geneNames[which(moduleColors==color)]
+  write.table(module, paste("module_",color, ".txt",sep=""), sep="\t", row.names=FALSE, col.names=FALSE,quote=FALSE) }
+# Export the network into edge and node list files Cytoscape can read
+load(net$TOMFiles[1], verbose=T)
+TOM <- as.matrix(TOM)
+dimnames(TOM) <- list(geneNames, geneNames)
+for(i in module_colors){
+  modules = i
+    probes = colnames(Expr3)
+  inModule = is.finite(match(moduleColors, modules))
+  modProbes = probes[inModule]
+  modTOM = TOM[inModule, inModule]
+  dimnames(modTOM) = list(modProbes, modProbes)
+  cyt = exportNetworkToCytoscape(modTOM,edgeFile = paste("cyt_edges_", paste(modules, collapse="-"), ".txt", sep=""),nodeFile=paste("cyt_nodes_", paste(modules, collapse="-"), ".txt", sep=""),weighted = TRUE,threshold = 0.18, nodeNames = modProbes, nodeAttr = moduleColors[inModule]) }

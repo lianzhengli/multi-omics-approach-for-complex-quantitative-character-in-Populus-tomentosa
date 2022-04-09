@@ -1,0 +1,6 @@
+vcftools --vcf pto.snp.recode.vcf  --weir-fst-pop pop1.txt --weir-fst-pop pop2.txt --fst-window-size 2000 --fst-window-step 1000 --out pop12_fst
+vcftools --vcf pto.snp.recode.vcf  --weir-fst-pop pop1.txt --weir-fst-pop pop3.txt --fst-window-size 2000 --fst-window-step 1000 --out pop13_fst
+vcftools --vcf pto.snp.recode.vcf  --weir-fst-pop pop2.txt --weir-fst-pop pop3.txt --fst-window-size 2000 --fst-window-step 1000 --out pop23_fst
+vcftools --vcf pto.pop1.snp.recode.vcf  --window-pi 2000 --window-pi-step 1000 --out pop1_pi
+vcftools --vcf pto.pop2.snp.recode.vcf  --window-pi 2000 --window-pi-step 1000 --out pop2_pi
+vcftools --vcf pto.pop3.snp.recode.vcf  --window-pi 2000 --window-pi-step 1000 --out pop3_pi

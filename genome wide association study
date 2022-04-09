@@ -1,0 +1,38 @@
+vcftools --vcf all.snp.biallele.maf0.05.miss0.8.recode.vcf --keep pto.txt --recode --recode-INFO-all --out pto.snp.recode.vcf
+plink --vcf pto.snp.recode.vcf --aec --maf 0.05 --recode --out pto
+awk -F" " '{print $1}' pto.map >5
+head -n 5 5
+awk -F"_" '{print $3}' 5 >1
+head -n 5 1
+awk -F" " '{print $4}' pto.map >2
+head -n 5 2
+awk -F" " '{print $4}' pto.map >4
+head -n 5 4
+awk -F" " '{print $3}' pto.map >3
+head -n 5 3
+paste 1 2 3 4 > 6
+head -n 5 6
+tail -n 5 6
+awk -F " " '{if ($1==0) $1=19}1' 6 > 7
+awk -F" " '{print $1"_"$4}' 7 >2
+head -n 5 2
+tail -n 5 2
+awk -F" " '{print $1}' 7 >1
+paste 1 2 3 4 > 8
+head 8
+tail 8
+mv 8 pto.map
+plink --file pto --aec --indep-pairwise 100 10 0.20 --out pto.ld0.20.out
+plink --file pto --aec --extract pto.ld0.20.out.prune.in --recode --out pto.ld0.20.out.prunedata
+plink --noweb --file  pto.ld0.20.out.prunedata --aec --make-bed --out pto.ld0.20
+plink --file pto.ld0.20.out.prunedata --aec --recode 12 --output-missing-genotype 0 --transpose --out pto.ld0.20
+plink --file pto.ld0.20.out.prunedata --aec --recode vcf-iid --out pto.ld0.20
+awk -F" " '{print $1}' plink303.ld0.70.fam > individual
+for i in {2..8}
+do
+admixture --cv pto.ld0.20.bed $i >> log.txt
+done
+grep "CV" error log.txt > the_best_hit
+emmax-kin-intel64 -v -s -d 10 pto.ld0.20.tped
+emmax -v -d 10 -t pto.ld0.20 -p phenotype_1.txt -k pto.ld0.20.hBN.kinf -c Q3.txt -o phenotype_1
+sort -g -k 3 phenotype_1.ps > phenotype_1.sort
