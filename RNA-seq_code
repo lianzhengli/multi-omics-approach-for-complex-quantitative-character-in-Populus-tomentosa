@@ -1,0 +1,6 @@
+hisat2-build -f reference.fa -p 7 ./ref   
+hisat2 -q -x ref --min-intronlen 20 --max-intronlen 4000 --rna-strandness RF -1 sample1.good.1.fq.gz -2 sample1.good.2.fq.gz -S sample1.sam --dta-cufflinks 2> $i.hisat2.log
+samtools view -Su $i.sam | samtools sort - -@ 4 -o ./sorted/$i.sorted.bam
+cuffquant -o cuffquant_out/$m -p 8 -b genome.softmask.fasta -u genome.gtf ./$m.sorted.bam
+cuffnorm --no-update-check -o cuffnorm_out/cuffnorm -p 32 -L sample1,sample2 genome.gtf sample1/abundances.cxb sample2/abundances.cxb
+cuffdiff -p 16 -u ref/all.gff3 -b ref/ reference.fa -o deg -L R1_log,R1_UV,irrE_1og,irrE_UV R1_log_out/accepted_hits.bam R1_UV_out/accepted_hits.bam irrE_1og_out/accepted_hits.bam irrE_UV_out/accepted_hits.bam > run.log
